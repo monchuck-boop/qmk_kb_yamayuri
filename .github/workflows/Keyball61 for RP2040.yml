@@ -67,6 +67,23 @@ jobs:
           echo "#ifndef NOP_FUDGE" >> "$CONFIG_FILE"
           echo "#define NOP_FUDGE 2" >> "$CONFIG_FILE"
           echo "#endif" >> "$CONFIG_FILE"
+          
+          # === USB記述子未定義エラーの解消パッチを追加 ===
+          echo "#ifndef VENDOR_ID" >> "$CONFIG_FILE"
+          echo "#define VENDOR_ID 0x1209" >> "$CONFIG_FILE"
+          echo "#endif" >> "$CONFIG_FILE"
+          echo "#ifndef PRODUCT_ID" >> "$CONFIG_FILE"
+          echo "#define PRODUCT_ID 0x2320" >> "$CONFIG_FILE"
+          echo "#endif" >> "$CONFIG_FILE"
+          echo "#ifndef DEVICE_VER" >> "$CONFIG_FILE"
+          echo "#define DEVICE_VER 0x0001" >> "$CONFIG_FILE"
+          echo "#endif" >> "$CONFIG_FILE"
+          echo "#ifndef MANUFACTURER" >> "$CONFIG_FILE"
+          echo "#define MANUFACTURER \"Yushakobo\"" >> "$CONFIG_FILE"
+          echo "#endif" >> "$CONFIG_FILE"
+          echo "#ifndef PRODUCT" >> "$CONFIG_FILE"
+          echo "#define PRODUCT \"Keyball61 RP2040\"" >> "$CONFIG_FILE"
+          echo "#endif" >> "$CONFIG_FILE"
         fi
 
         KEYBALL_C="keyboards/keyball_rp2040/lib/keyball/keyball.c"
