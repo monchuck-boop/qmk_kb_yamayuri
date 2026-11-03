@@ -46,10 +46,11 @@ jobs:
         fi
 
         echo "=== Patching config.h and rules.mk for Keyball61 RP2040 ==="
-        # 2. QMKの古いパーサー対策として、info.jsonをkeyboards直下にも配置
+        # QMKの古いパーサーでinfo.jsonの警告を最小化するため、階層を合わせてダミー配置
+        mkdir -p keyboards/keyball_rp2040/keyball61
         cp keyboards/keyball_rp2040/keyball61/info.json keyboards/keyball_rp2040/info.json || true
         
-        # 3. rules.mk に正しいRP2040用のMCUターゲット(Cortex-M0+)を設定
+        # 2. rules.mk に正しいRP2040用ターゲットを設定
         TARGET_RULES="keyboards/keyball_rp2040/rules.mk"
         if [ -f "$TARGET_RULES" ]; then
           echo "MCU = RP2040" >> "$TARGET_RULES"
@@ -62,13 +63,21 @@ jobs:
           echo "BOOTLOADER = rp2040" >> "$SUB_RULES"
         fi
 
-        # 4. LED未定義エラー (RGBLED_NUM) の回避用パッチをconfig.hに強制注入
+        # 3. LED未定義エラー (RGBLED_NUM) の回避用パッチ
         CONFIG_FILE="keyboards/keyball_rp2040/keyball61/config.h"
         if [ -f "$CONFIG_FILE" ]; then
           echo "" >> "$CONFIG_FILE"
           echo "#ifndef RGBLED_NUM" >> "$CONFIG_FILE"
-          echo "#define RGBLED_NUM 0" >> "$CONFIG_FILE" # 一旦0個としてエラーを回避(keymap側等で上書きされます)
+          echo "#define RGBLED_NUM 0" >> "$CONFIG_FILE"
           echo "#endif" >> "$CONFIG_FILE"
+        fi
+
+        echo "=== Patching keyball.c to bypass OS Detection function ==="
+        # 4. ベースとなるQMKに存在しない 'detected_host_os' 周りのエラー箇所を安全に置換します
+        KEYBALL_C="keyboards/keyball_rp2040/lib/keyball/keyball.c"
+        if [ -f "$KEYBALL_C" ]; then
+          # エラーの原因となっている条件分岐を、QMK本体の機能に依存しない標準的な形に書き換えます
+          sed -i 's/if (detected_host_os() == OS_WINDOWS || detected_host_os() == OS_LINUX)/if (1)/g' "$KEYBALL_C"
         fi
 
         echo "=== Starting QMK Compile ==="
@@ -80,6 +89,7 @@ jobs:
       with:
         name: keyball61-rp2040-firmware
         path: |
-          qmk_firmware/*.hex
-          qmk_firmware/*.bin
-          qmk_firmware/*.uf2
+          qmk_firmware/.build/*.hex
+          qmk_firmware/.build/*.bin
+          qmk_firmware/.build/*.uf2
+
