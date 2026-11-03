@@ -1,57 +1,54 @@
-name: Build Keyball61 for RP2040
+name: Build Keyball61 RP2040 Firmware
 
 on:
   push:
-    branches: [ "dev", "main", "master" ]
+    branches: [ "yamaryu211" ]
   pull_request:
-    branches: [ "dev" ]
-  workflow_dispatch: # 手動実行用
-
-permissions:
-  contents: read
+    branches: [ "yamaryu211" ]
+  workflow_dispatch:
 
 jobs:
-  build-rp2040:
+  build:
     runs-on: ubuntu-latest
+    container: qmkfm/qmk_cli:latest
 
     steps:
-    # ▼▼▼ チェックアウトの修正版 ▼▼▼
-    - name: Checkout repository
-      uses: actions/checkout@v4  # v4に更新してNodeの警告を抑制
+    - name: Checkout keyboard repository
+      uses: actions/checkout@v4
       with:
+        path: keyboards/keyball
+
+    - name: Checkout QMK Firmware
+      uses: actions/checkout@v4
+      with:
+        repository: qmk/qmk_firmware
         submodules: recursive
-        persist-credentials: false # コンテナ内でのGit認証エラー(128)を回避する設定
-    # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+        path: qmk_firmware
 
-    - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
-
-    - name: Install QMK CLI & ARM Toolchain
+    - name: Setup environment
       run: |
-        python3 -m pip install --upgrade pip
-        pip3 install qmk
-        sudo apt-get update
-        sudo apt-get install -y gcc-arm-none-eabi libnewlib-arm-none-eabi build-essential
-
-    - name: Initialize QMK
-      run: |
+        # 自身のソースコード（keyball61フォルダを含むリポジトリ）をQMKのしかるべき配置に移動
+        # ※もしリポジトリ直下がkeyball61ではなく別の構造の場合はここを調整します
+        if [ -d "keyboards/keyball/keyball61" ]; then
+          mv keyboards/keyball/keyball61 qmk_firmware/keyboards/
+        else
+          mv keyboards/keyball qmk_firmware/keyboards/keyball61
+        fi
+        
+        cd qmk_firmware
         qmk setup -y
 
-    - name: Symlink Keyboard to QMK Environment
+    - name: Compile Firmware
       run: |
-        mkdir -p ~/qmk_firmware/keyboards/yamayuri
-        ln -s "$GITHUB_WORKSPACE/ble-micro-pro" ~/qmk_firmware/keyboards/yamayuri/keyball61
+        cd qmk_firmware
+        # RP2040ビルド：ブートローダー指定を伴うコンパイル、またはrp2040ターゲットの指定
+        # 一般的なKeyballのRP2040ビルドコマンド（環境に応じて default や vial 等に変更してください）
+        qmk compile -kb keyball61 -km default
 
-    - name: Compile RP2040 Firmware
-      run: |
-        qmk compile -kb yamayuri/keyball61 -km default
-
-    - name: Upload UF2 Artifact
+    - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: keyball61-rp2040-uf2
+        name: keyball61-rp2040-firmware
         path: |
-          ~/qmk_firmware/*.uf2
-          ~/qmk_firmware/*.bin
+          qmk_firmware/*.uf2
+          qmk_firmware/*.bin
