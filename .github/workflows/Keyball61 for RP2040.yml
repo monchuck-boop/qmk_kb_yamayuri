@@ -67,7 +67,7 @@ jobs:
         if [ -f "$CONFIG_FILE" ]; then
           echo "" >> "$CONFIG_FILE"
           echo "#ifndef RGBLED_NUM" >> "$CONFIG_FILE"
-          echo "#define RGBLED_NUM 0" >> "$CONFIG_FILE"
+          echo "#define RGBLED_NUM 9" >> "$CONFIG_FILE"
           echo "#endif" >> "$CONFIG_FILE"
         fi
 
