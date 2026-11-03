@@ -40,11 +40,28 @@ jobs:
         git config --global --add safe.directory $(pwd)
         qmk setup -y
         
-        # フォルダの配置と確認、コンパイルの実行
+        # フォルダを正しい位置に配置
         if [ -d "keyball_rp2040" ]; then
           cp -r keyball_rp2040 keyboards/
         fi
-        qmk compile -kb keyball_rp2040/keyball61 -km default
+
+        echo "=== Tweaking rules.mk for RP2040 compatibility ==="
+        # AVR用ブートローダーの誤認識を防ぎ、RP2040として確実に処理させるための設定をrules.mkに強制注入します
+        TARGET_RULES="keyboards/keyball_rp2040/rules.mk"
+        if [ -f "$TARGET_RULES" ]; then
+          echo "MCU = RP2040" >> "$TARGET_RULES"
+          echo "BOOTLOADER = rp2040" >> "$TARGET_RULES"
+        fi
+        
+        SUB_RULES="keyboards/keyball_rp2040/keyball61/rules.mk"
+        if [ -f "$SUB_RULES" ]; then
+          echo "MCU = RP2040" >> "$SUB_RULES"
+          echo "BOOTLOADER = rp2040" >> "$SUB_RULES"
+        fi
+
+        echo "=== Starting QMK Compile ==="
+        # 内部パーサーの警告やミスマッチをバイパスするため、直接makeコマンドに環境変数を渡してビルドを叩きます
+        qmk compile -kb keyball_rp2040/keyball61 -km default || make keyball_rp2040/keyball61:default MCU=RP2040 BOOTLOADER=rp2040
 
     - name: Upload Firmware Artifact
       uses: actions/upload-artifact@v4
