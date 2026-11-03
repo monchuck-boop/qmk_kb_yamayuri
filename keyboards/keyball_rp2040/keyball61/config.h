@@ -78,6 +78,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define SPI_MISO_PIN GP20
 #define SPI_MOSI_PIN GP23
 
+// === ビルドエラー対策の追加定義 ===
+#define KEYBALL_61
+#define RGBLED_NUM 9
+#define NOP_FUDGE 2
+
+#ifndef VENDOR_ID
+#define VENDOR_ID 0x1209
+#endif
+#ifndef PRODUCT_ID
+#define PRODUCT_ID 0x2320
+#endif
+#ifndef DEVICE_VER
+#define DEVICE_VER 0x0001
+#endif
+#ifndef MANUFACTURER
+#define MANUFACTURER "Yushakobo"
+#endif
+#ifndef PRODUCT
+#define PRODUCT "Keyball61 RP2040"
+#endif
+
+
+
 // To squeeze firmware size
 // #undef LOCKING_SUPPORT_ENABLE
 // #undef LOCKING_RESYNC_ENABLE
