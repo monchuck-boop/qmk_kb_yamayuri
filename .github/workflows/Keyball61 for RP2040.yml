@@ -84,7 +84,6 @@ jobs:
           echo "#define PRODUCT \"Keyball61 RP2040\"" >> "$CONFIG_FILE"
           echo "#endif" >> "$CONFIG_FILE"
 
-          # === Keyballモデル判別エラーの解消パッチを追加 ===
           echo "#ifndef KEYBALL_61" >> "$CONFIG_FILE"
           echo "#define KEYBALL_61" >> "$CONFIG_FILE"
           echo "#endif" >> "$CONFIG_FILE"
@@ -109,7 +108,7 @@ jobs:
           echo "    { K00, K01, K02, K03, K04, K05, K06, K07 }, \\" >> "$KEYBALL_H"
           echo "    { K08, K09, K0a, K0b, K0c, K0d, K0e, K0f }, \\" >> "$KEYBALL_H"
           echo "    { K10, K11, K12, K13, K14, K15, K16, K17 }, \\" >> "$KEYBALL_H"
-          echo "    { K18, K19, K1a, K1b, K1c, K1d, K1e, K1f }, \\" >> "$CONFIG_FILE" # config.hのパッチ重複による誤動作を防ぐため展開先を維持
+          echo "    { K18, K19, K1a, K1b, K1c, K1d, K1e, K1f }, \\" >> "$KEYBALL_H"
           echo "    { K20, K21, K22, K23, K24, K25, K26, K27 }, \\" >> "$KEYBALL_H"
           echo "    { K28, K29, K2a, K2b, K2c, K2d, K2e, K2f }, \\" >> "$KEYBALL_H"
           echo "    { K30, K31, K32, K33, K34, K35, K36, K37 }, \\" >> "$KEYBALL_H"
