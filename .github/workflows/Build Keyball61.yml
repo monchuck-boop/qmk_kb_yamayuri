@@ -5,17 +5,23 @@ on:
     branches: [ "dev", "main", "master" ]
   pull_request:
     branches: [ "dev" ]
-  workflow_dispatch: # GitHub上で手動実行するためのボタンを設置
+  workflow_dispatch: # 手動実行用
+
+permissions:
+  contents: read
 
 jobs:
   build-rp2040:
     runs-on: ubuntu-latest
 
     steps:
+    # ▼▼▼ チェックアウトの修正版 ▼▼▼
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v4  # v4に更新してNodeの警告を抑制
       with:
-        submodules: recursive # QMK本体や依存サブモジュールを同時に取得
+        submodules: recursive
+        persist-credentials: false # コンテナ内でのGit認証エラー(128)を回避する設定
+    # ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
     - name: Setup Python
       uses: actions/setup-python@v5
@@ -26,7 +32,6 @@ jobs:
       run: |
         python3 -m pip install --upgrade pip
         pip3 install qmk
-        # RP2040のビルドに必要なGCC ARMコンパイラ一式をUbuntu環境に導入
         sudo apt-get update
         sudo apt-get install -y gcc-arm-none-eabi libnewlib-arm-none-eabi build-essential
 
@@ -36,16 +41,11 @@ jobs:
 
     - name: Symlink Keyboard to QMK Environment
       run: |
-        # リポジトリ内の ble-micro-pro フォルダを QMK の keyboards 以下にリンク
-        # (キーボードフォルダ構造に応じて `yamayuri` など適切な配下に配置します)
         mkdir -p ~/qmk_firmware/keyboards/yamayuri
         ln -s "$GITHUB_WORKSPACE/ble-micro-pro" ~/qmk_firmware/keyboards/yamayuri/keyball61
 
     - name: Compile RP2040 Firmware
       run: |
-        # RP2040用のコンパイルを実行します。
-        # キーボード名(yamayuri/keyball61)やキーマップ(default)は環境に合わせて調整してください。
-        # ※ rules.mk 側で「BOOTLOADER = rp2040」等の指定が正しく入っている想定です。
         qmk compile -kb yamayuri/keyball61 -km default
 
     - name: Upload UF2 Artifact
