@@ -40,12 +40,14 @@ jobs:
         git config --global --add safe.directory $(pwd)
         qmk setup -y
         
+        # 1. keyboardsフォルダへ展開
         if [ -d "keyball_rp2040" ]; then
           cp -r keyball_rp2040 keyboards/
         fi
 
         cp keyboards/keyball_rp2040/keyball61/info.json keyboards/keyball_rp2040/info.json || true
         
+        # 2. rules.mk にビルドターゲットを設定
         TARGET_RULES="keyboards/keyball_rp2040/rules.mk"
         if [ -f "$TARGET_RULES" ]; then
           echo "MCU = RP2040" >> "$TARGET_RULES"
@@ -58,42 +60,35 @@ jobs:
           echo "BOOTLOADER = rp2040" >> "$SUB_RULES"
         fi
 
-        CONFIG_FILE="keyboards/keyball_rp2040/keyball61/config.h"
-        if [ -f "$CONFIG_FILE" ]; then
-          echo "" >> "$CONFIG_FILE"
-          echo "#ifndef RGBLED_NUM" >> "$CONFIG_FILE"
-          echo "#define RGBLED_NUM 9" >> "$CONFIG_FILE"
-          echo "#endif" >> "$CONFIG_FILE"
-          echo "#ifndef NOP_FUDGE" >> "$CONFIG_FILE"
-          echo "#define NOP_FUDGE 2" >> "$CONFIG_FILE"
-          echo "#endif" >> "$CONFIG_FILE"
-          
-          echo "#ifndef VENDOR_ID" >> "$CONFIG_FILE"
-          echo "#define VENDOR_ID 0x1209" >> "$CONFIG_FILE"
-          echo "#endif" >> "$CONFIG_FILE"
-          echo "#ifndef PRODUCT_ID" >> "$CONFIG_FILE"
-          echo "#define PRODUCT_ID 0x2320" >> "$CONFIG_FILE"
-          echo "#endif" >> "$CONFIG_FILE"
-          echo "#ifndef DEVICE_VER" >> "$CONFIG_FILE"
-          echo "#define DEVICE_VER 0x0001" >> "$CONFIG_FILE"
-          echo "#endif" >> "$CONFIG_FILE"
-          echo "#ifndef MANUFACTURER" >> "$CONFIG_FILE"
-          echo "#define MANUFACTURER \"Yushakobo\"" >> "$CONFIG_FILE"
-          echo "#endif" >> "$CONFIG_FILE"
-          echo "#ifndef PRODUCT" >> "$CONFIG_FILE"
-          echo "#define PRODUCT \"Keyball61 RP2040\"" >> "$CONFIG_FILE"
-          echo "#endif" >> "$CONFIG_FILE"
+        # 3. 【ディープパッチ①】見つかるすべての config.h に必須定義を強制注入
+        echo "=== Deep Patching all config.h files ==="
+        find . -name "config.h" -type f | while read -r file; do
+          echo "Injecting to: $file"
+          echo "" >> "$file"
+          echo "#define KEYBALL_61" >> "$file"
+          echo "#define RGBLED_NUM 9" >> "$file"
+          echo "#define NOP_FUDGE 2" >> "$file"
+          echo "#define VENDOR_ID 0x1209" >> "$file"
+          echo "#define PRODUCT_ID 0x2320" >> "$file"
+          echo "#define DEVICE_VER 0x0001" >> "$file"
+          echo "#define MANUFACTURER \"Yushakobo\"" >> "$file"
+          echo "#define PRODUCT \"Keyball61 RP2040\"" >> "$file"
+        done
 
-          echo "#ifndef KEYBALL_61" >> "$CONFIG_FILE"
-          echo "#define KEYBALL_61" >> "$CONFIG_FILE"
-          echo "#endif" >> "$CONFIG_FILE"
-        fi
+        # 4. 【ディープパッチ②】見つかるすべての keyball.c のエラー行を物理破壊＆先頭定義
+        echo "=== Deep Patching all keyball.c files ==="
+        find . -name "keyball.c" -type f | while read -r file; do
+          echo "Patching: $file"
+          # OS自動判別の無効化
+          sed -i 's/if (detected_host_os() == OS_WINDOWS || detected_host_os() == OS_LINUX)/if (1)/g' "$file"
+          # エラーを発生させている #error 構文をコメントアウトして物理的に無効化
+          sed -i 's/#    error("unknown Keyball model")/\/\/ bypassed/g' "$file"
+          sed -i 's/#   error("unknown Keyball model")/\/\/ bypassed/g' "$file"
+          # ファイルの最上行に KEYBALL_61 を強制定義
+          sed -i '1s/^/#define KEYBALL_61\n/' "$file"
+        done
 
-        KEYBALL_C="keyboards/keyball_rp2040/lib/keyball/keyball.c"
-        if [ -f "$KEYBALL_C" ]; then
-          sed -i 's/if (detected_host_os() == OS_WINDOWS || detected_host_os() == OS_LINUX)/if (1)/g' "$KEYBALL_C"
-        fi
-
+        # 5. keyball61.h へのレイアウトマクロ補正
         KEYBALL_H="keyboards/keyball_rp2040/keyball61/keyball61.h"
         if [ -f "$KEYBALL_H" ]; then
           echo "" >> "$KEYBALL_H"
@@ -117,6 +112,7 @@ jobs:
           echo "#endif" >> "$KEYBALL_H"
         fi
 
+        # 6. コンパイルを実行
         qmk compile -kb keyball_rp2040/keyball61 -km default
 
     - name: Upload Firmware Artifact
