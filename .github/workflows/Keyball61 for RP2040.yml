@@ -11,7 +11,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04 # 安定したUbuntu環境を使用します
+    runs-on: ubuntu-24.04
 
     steps:
     - name: Checkout qmk_firmware
@@ -25,7 +25,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.11' # QMKと互換性の高いバージョンを指定
+        python-version: '3.11'
 
     - name: Install System Dependencies
       run: |
@@ -35,7 +35,6 @@ jobs:
     - name: Install QMK CLI and Dependencies
       run: |
         cd qmk_firmware
-        # Python環境にQMK CLIと必要な依存関係（appdirs含む）を確実にインストールします
         python3 -m pip install --upgrade pip
         python3 -m pip install qmk
         if [ -f "requirements.txt" ]; then
@@ -43,13 +42,23 @@ jobs:
         fi
         python3 -m pip install appdirs
 
-    - name: Run QMK Compile
+    - name: Fix Directory Structure and Run Compile
       run: |
         cd qmk_firmware
-        # Gitの安全なディレクトリ設定を追加
         git config --global --add safe.directory $(pwd)
-        # QMK環境のセットアップとコンパイル
         qmk setup -y
+        
+        echo "=== Checking Keyboard Directory Layout ==="
+        # もしリポジトリのルートにあるkeyboardsフォルダ内にkeyball61があるのにQMKが認識しない場合、
+        # QMKのホーム直下の正しい位置にフォルダをリンク/移動させます。
+        if [ -d "keyboards/keyball61" ]; then
+          echo "Found keyball61 in repository root."
+        else
+          echo "keyball61 not found in repository root. Checking subfolders..."
+          ls -la keyboards/ || true
+        fi
+        
+        # QMKコンパイルを実行
         qmk compile -kb keyball61 -km default
 
     - name: Upload Firmware Artifact
