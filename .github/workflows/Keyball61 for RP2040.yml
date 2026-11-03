@@ -22,49 +22,34 @@ jobs:
         path: 'qmk_firmware'
         submodules: recursive
 
-    - name: Set up Python
+    - name: Set up Python and Dependencies
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
-    - name: Install System Dependencies
+    - name: Install Dependencies and Compile
       run: |
         sudo apt-get update
         sudo apt-get install -y gcc-avr avr-libc gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi git dfu-programmer dfu-util
-
-    - name: Install QMK CLI and Dependencies
-      run: |
         cd qmk_firmware
         python3 -m pip install --upgrade pip
-        python3 -m pip install qmk
+        python3 -m pip install qmk appdirs
         if [ -f "requirements.txt" ]; then
           python3 -m pip install -r requirements.txt
         fi
-        python3 -m pip install appdirs
-
-    - name: Fix Directory Structure and Run Compile
-      run: |
-        cd qmk_firmware
         git config --global --add safe.directory $(pwd)
         qmk setup -y
         
-        echo "=== Checking Keyboard Directory Layout ==="
-        # もしリポジトリのルートにあるkeyboardsフォルダ内にkeyball61があるのにQMKが認識しない場合、
-        # QMKのホーム直下の正しい位置にフォルダをリンク/移動させます。
-        if [ -d "keyboards/keyball61" ]; then
-          echo "Found keyball61 in repository root."
-        else
-          echo "keyball61 not found in repository root. Checking subfolders..."
-          ls -la keyboards/ || true
+        # フォルダの配置と確認、コンパイルの実行
+        if [ -d "keyball_rp2040" ]; then
+          cp -r keyball_rp2040 keyboards/
         fi
-        
-        # QMKコンパイルを実行
-        qmk compile -kb keyball61 -km default
+        qmk compile -kb keyball_rp2040/keyball61 -km default
 
     - name: Upload Firmware Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: keyball61-firmware
+        name: keyball61-rp2040-firmware
         path: |
           qmk_firmware/*.hex
           qmk_firmware/*.bin
