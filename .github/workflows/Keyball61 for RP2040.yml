@@ -11,8 +11,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    container: qmkfm/qmk_cli:latest
+    runs-on: ubuntu-24.04 # 安定したUbuntu環境を使用します
 
     steps:
     - name: Checkout qmk_firmware
@@ -23,29 +22,33 @@ jobs:
         path: 'qmk_firmware'
         submodules: recursive
 
-    - name: Verify Keyboards Directory and Branch
-      run: |
-        cd qmk_firmware
-        echo "=== Current Git Branch ==="
-        git branch -a
-        echo "=== Keyboards Folder List ==="
-        ls -la keyboards/
-        if [ -d "keyboards/keyball61" ]; then
-          echo "✅ keyball61 folder successfully found."
-        else
-          echo "❌ ERROR: keyball61 folder not found in keyboards/ directory."
-        fi
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11' # QMKと互換性の高いバージョンを指定
 
-    - name: Fix Python Dependencies
+    - name: Install System Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc-avr avr-libc gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi git dfu-programmer dfu-util
+
+    - name: Install QMK CLI and Dependencies
       run: |
         cd qmk_firmware
-        # エラーログの指示に従い、QMKの内部Python環境に必要な依存ライブラリを強制インストールします
-        /opt/uv/tools/qmk/bin/python3 -m pip install --break-system-packages -r requirements.txt appdirs
+        # Python環境にQMK CLIと必要な依存関係（appdirs含む）を確実にインストールします
+        python3 -m pip install --upgrade pip
+        python3 -m pip install qmk
+        if [ -f "requirements.txt" ]; then
+          python3 -m pip install -r requirements.txt
+        fi
+        python3 -m pip install appdirs
 
     - name: Run QMK Compile
       run: |
         cd qmk_firmware
-        # QMK環境を初期化して、ビルドを実行します
+        # Gitの安全なディレクトリ設定を追加
+        git config --global --add safe.directory $(pwd)
+        # QMK環境のセットアップとコンパイル
         qmk setup -y
         qmk compile -kb keyball61 -km default
 
@@ -53,4 +56,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: keyball61-firmware
-        path: qmk_firmware/.build/*.hex
+        path: |
+          qmk_firmware/*.hex
+          qmk_firmware/*.bin
+          qmk_firmware/*.uf2
