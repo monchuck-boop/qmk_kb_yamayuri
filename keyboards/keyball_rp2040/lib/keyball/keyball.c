@@ -1,3 +1,5 @@
+#define KEYBALL_61
+
 /*
 Copyright 2022 MURAOKA Taro (aka KoRoN, @kaoriya)
 
@@ -276,7 +278,7 @@ __attribute__((weak)) void keyball_on_apply_motion_to_mouse_scroll(keyball_motio
 
 // --- ここから追記 ---
     // windowsOSでスクロール方向反転
-    if (detected_host_os() == OS_WINDOWS || detected_host_os() == OS_LINUX){
+    if (1){ // 古いQMK環境との互換性のためOS判定をスキップ
         r->h = -r->h;
         r->v = -r->v;
     }
