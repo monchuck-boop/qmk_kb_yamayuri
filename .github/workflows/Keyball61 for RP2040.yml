@@ -1,54 +1,52 @@
-name: Build Keyball61 RP2040 Firmware
+name: Build QMK Firmware
 
 on:
   push:
-    branches: [ "yamaryu211" ]
+    branches:
+      - yamaryu211
   pull_request:
-    branches: [ "yamaryu211" ]
-  workflow_dispatch:
+    branches:
+      - yamaryu211
+  workflow_dispatch: # 手動実行も可能にします
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: qmkfm/qmk_cli:latest
+    container: qmkfm/qmk_cli:latest # QMK公式のビルド環境を使用
 
     steps:
-    - name: Checkout keyboard repository
+    - name: Checkout qmk_firmware
       uses: actions/checkout@v4
       with:
-        path: keyboards/keyball
-
-    - name: Checkout QMK Firmware
-      uses: actions/checkout@v4
-      with:
-        repository: qmk/qmk_firmware
+        repository: 'monchuck-boop/qmk_kb_yamayuri'
+        ref: 'yamaryu211'
+        path: 'qmk_firmware'
         submodules: recursive
-        path: qmk_firmware
 
-    - name: Setup environment
+    - name: Verify Keyboards Directory and Branch
       run: |
-        # 自身のソースコード（keyball61フォルダを含むリポジトリ）をQMKのしかるべき配置に移動
-        # ※もしリポジトリ直下がkeyball61ではなく別の構造の場合はここを調整します
-        if [ -d "keyboards/keyball/keyball61" ]; then
-          mv keyboards/keyball/keyball61 qmk_firmware/keyboards/
+        cd qmk_firmware
+        echo "=== Current Git Branch ==="
+        git branch -a
+        echo "=== Keyboards Folder List ==="
+        ls -la keyboards/
+        # keyball61フォルダが存在するかチェック
+        if [ -d "keyboards/keyball61" ]; then
+          echo "✅ keyball61 folder successfully found."
         else
-          mv keyboards/keyball qmk_firmware/keyboards/keyball61
+          echo "❌ ERROR: keyball61 folder not found in keyboards/ directory."
         fi
-        
-        cd qmk_firmware
-        qmk setup -y
 
-    - name: Compile Firmware
+    - name: Run QMK Compile
       run: |
         cd qmk_firmware
-        # RP2040ビルド：ブートローダー指定を伴うコンパイル、またはrp2040ターゲットの指定
-        # 一般的なKeyballのRP2040ビルドコマンド（環境に応じて default や vial 等に変更してください）
+        # QMKの環境設定を初期化
+        qmk setup -y
+        # コンパイルを実行 (キーマップ名を適宜変更してください。ここでは default としています)
         qmk compile -kb keyball61 -km default
 
-    - name: Upload Artifact
+    - name: Upload Firmware Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: keyball61-rp2040-firmware
-        path: |
-          qmk_firmware/*.uf2
-          qmk_firmware/*.bin
+        name: keyball61-firmware
+        path: qmk_firmware/.build/*.hex # または *.bin (コントローラーの種類に合わせて自動作成されたファイルが対象)
