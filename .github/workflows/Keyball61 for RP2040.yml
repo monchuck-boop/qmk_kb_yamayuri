@@ -7,12 +7,12 @@ on:
   pull_request:
     branches:
       - yamaryu211
-  workflow_dispatch: # 手動実行も可能にします
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: qmkfm/qmk_cli:latest # QMK公式のビルド環境を使用
+    container: qmkfm/qmk_cli:latest
 
     steps:
     - name: Checkout qmk_firmware
@@ -30,23 +30,27 @@ jobs:
         git branch -a
         echo "=== Keyboards Folder List ==="
         ls -la keyboards/
-        # keyball61フォルダが存在するかチェック
         if [ -d "keyboards/keyball61" ]; then
           echo "✅ keyball61 folder successfully found."
         else
           echo "❌ ERROR: keyball61 folder not found in keyboards/ directory."
         fi
 
+    - name: Fix Python Dependencies
+      run: |
+        cd qmk_firmware
+        # エラーログの指示に従い、QMKの内部Python環境に必要な依存ライブラリを強制インストールします
+        /opt/uv/tools/qmk/bin/python3 -m pip install --break-system-packages -r requirements.txt appdirs
+
     - name: Run QMK Compile
       run: |
         cd qmk_firmware
-        # QMKの環境設定を初期化
+        # QMK環境を初期化して、ビルドを実行します
         qmk setup -y
-        # コンパイルを実行 (キーマップ名を適宜変更してください。ここでは default としています)
         qmk compile -kb keyball61 -km default
 
     - name: Upload Firmware Artifact
       uses: actions/upload-artifact@v4
       with:
         name: keyball61-firmware
-        path: qmk_firmware/.build/*.hex # または *.bin (コントローラーの種類に合わせて自動作成されたファイルが対象)
+        path: qmk_firmware/.build/*.hex
