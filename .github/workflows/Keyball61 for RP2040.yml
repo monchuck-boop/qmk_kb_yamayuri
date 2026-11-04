@@ -40,22 +40,19 @@ jobs:
         git config --global --add safe.directory $(pwd)
         qmk setup -y
         
-        # keyboardsフォルダへそのまま配置
+        # keyboardsフォルダへ展開
         if [ -d "keyball_rp2040" ]; then
           cp -r keyball_rp2040 keyboards/
         fi
 
-        # info.json を親階層にコピー
-        cp keyboards/keyball_rp2040/keyball61/info.json keyboards/keyball_rp2040/info.json || true
-        
-        # 1. rules.mkにマイコン情報と、すべての.cファイルにKEYBALL_61を適用するグローバルオプションを注入
+        # 1. rules.mkにマイコン情報と、コンパイラへ確実にKEYBALL_61を渡す定義を直接追記
         TARGET_RULES="keyboards/keyball_rp2040/rules.mk"
         if [ -f "$TARGET_RULES" ]; then
           echo "MCU = RP2040" >> "$TARGET_RULES"
           echo "BOOTLOADER = rp2040" >> "$TARGET_RULES"
-          # 💡 全ファイル共通のコンパイル引数に強制的にKEYBALL_61を追加します
           echo "OPT_DEFS += -DKEYBALL_61" >> "$TARGET_RULES"
         fi
+        
         SUB_RULES="keyboards/keyball_rp2040/keyball61/rules.mk"
         if [ -f "$SUB_RULES" ]; then
           echo "MCU = RP2040" >> "$SUB_RULES"
@@ -63,13 +60,16 @@ jobs:
           echo "OPT_DEFS += -DKEYBALL_61" >> "$SUB_RULES"
         fi
 
-        # 2. QMKの古い環境のせいでエラーが出ていたOS自動判別関数の箇所を安全に無害化
+        # 2. info.json を親階層に配置（QMKのパーサーバグ対策）
+        cp keyboards/keyball_rp2040/keyball61/info.json keyboards/keyball_rp2040/info.json || true
+
+        # 3. 古いQMK環境でビルドエラーを引き起こすOS自動判別関数の箇所を安全に無害化
         KEYBALL_C="keyboards/keyball_rp2040/lib/keyball/keyball.c"
         if [ -f "$KEYBALL_C" ]; then
           sed -i 's/if (detected_host_os() == OS_WINDOWS || detected_host_os() == OS_LINUX)/if (1)/g' "$KEYBALL_C"
         fi
 
-        # 3. keyball61.h への配列マッピング展開
+        # 4. keyball61.h への配列マッピングの補正展開
         KEYBALL_H="keyboards/keyball_rp2040/keyball61/keyball61.h"
         if [ -f "$KEYBALL_H" ]; then
           echo "" >> "$KEYBALL_H"
@@ -93,8 +93,8 @@ jobs:
           echo "#endif" >> "$KEYBALL_H"
         fi
 
-        # 4. コンパイル引数に直接結合してビルドを実行
-        qmk compile -kb keyball_rp2040/keyball61 -km default -- -j1 OPT_DEFS+="-DKEYBALL_61"
+        # 5. 引数バグを避けるため、余計なmakeオプションを排除したクリーンなコマンドで実行
+        qmk compile -kb keyball_rp2040/keyball61 -km default
 
     - name: Upload Firmware Artifact
       uses: actions/upload-artifact@v4
