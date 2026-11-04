@@ -1,4 +1,4 @@
-name: Build QMK Firmware
+name: Build QMK Firmware (Clean Environment)
 
 on:
   push:
@@ -14,103 +14,62 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-    - name: Checkout qmk_firmware
+    # 1. 【環境リセット】最新・クリーンなQMK公式本家リポジトリ本体（最新版）をクローン
+    - name: Checkout Official QMK Firmware
+      uses: actions/checkout@v4
+      with:
+        repository: 'qmk/qmk_firmware'
+        ref: 'master' # 最新の本家コアを使用
+        path: 'qmk_firmware'
+        submodules: recursive
+
+    # 2. あなたのカスタムキーボード設定データ（yamaryu211ブランチ）を別ディレクトリにダウンロード
+    - name: Checkout User Keyboard Config
       uses: actions/checkout@v4
       with:
         repository: 'monchuck-boop/qmk_kb_yamayuri'
         ref: 'yamaryu211'
-        path: 'qmk_firmware'
-        submodules: recursive
+        path: 'user_config'
 
-    - name: Set up Python and Dependencies
+    - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
-    - name: Install Dependencies and Compile
+    - name: Install System Dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y gcc-avr avr-libc gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi git dfu-programmer dfu-util
-        cd qmk_firmware
         python3 -m pip install --upgrade pip
         python3 -m pip install qmk appdirs
-        if [ -f "requirements.txt" ]; then
-          python3 -m pip install -r requirements.txt
+
+    # 3. 【正規のインポート】あなたのキーボードフォルダだけを、公式QMKの「keyboards/」以下に正しくマッピング
+    - name: Import Keyboard to QMK Environment
+      run: |
+        # あなたのリポジトリ直下にある keyball_rp2040 フォルダのみを、本家QMKのkeyboards以下にクリーンにコピーします
+        if [ -d "user_config/keyball_rp2040" ]; then
+          cp -r user_config/keyball_rp2040 qmk_firmware/keyboards/
+          echo "✅ keyball_rp2040 successfully imported to QMK keyboards directory."
+        else
+          echo "❌ ERROR: keyball_rp2040 directory not found in user repo!"
+          exit 1
         fi
+
+    # 4. Gitの安全設定を適用し、QMKを初期化して標準ビルドを実行
+    - name: Run Clean QMK Compile
+      run: |
+        cd qmk_firmware
         git config --global --add safe.directory $(pwd)
         qmk setup -y
         
-        # keyboardsフォルダへ展開
-        if [ -d "keyball_rp2040" ]; then
-          cp -r keyball_rp2040 keyboards/
-        fi
-
-        # info.json を親階層に配置（QMKの古いビルド規則への対策）
-        cp keyboards/keyball_rp2040/keyball61/info.json keyboards/keyball_rp2040/info.json || true
-        
-        # 1. rules.mkにマイコン情報とエラー抑制設定を注入
-        TARGET_RULES="keyboards/keyball_rp2040/rules.mk"
-        if [ -f "$TARGET_RULES" ]; then
-          echo "MCU = RP2040" >> "$TARGET_RULES"
-          echo "BOOTLOADER = rp2040" >> "$TARGET_RULES"
-          echo "WERROR = no" >> "$TARGET_RULES"
-        fi
-        SUB_RULES="keyboards/keyball_rp2040/keyball61/rules.mk"
-        if [ -f "$SUB_RULES" ]; then
-          echo "MCU = RP2040" >> "$SUB_RULES"
-          echo "BOOTLOADER = rp2040" >> "$SUB_RULES"
-          echo "WERROR = no" >> "$SUB_RULES"
-        fi
-
-        # 2. 【最重要パッチ】keyball.c のソースコード内のモデル判定処理を強制的にKEYBALL_61に固定・置換
-        KEYBALL_C="keyboards/keyball_rp2040/lib/keyball/keyball.c"
-        if [ -f "$KEYBALL_C" ]; then
-          echo "Patching keyball.c source code directly..."
-          # OS自動判別の無害化（互換性対策）
-          sed -i 's/if (detected_host_os() == OS_WINDOWS || detected_host_os() == OS_LINUX)/if (1)/g' "$KEYBALL_C"
-          
-          # モデル未定義で #error になる条件分岐の構文を、物理的に無効化・強制上書きします
-          sed -i 's/#    error("unknown Keyball model")/\/\/ bypassed/g' "$KEYBALL_C"
-          sed -i 's/#   error("unknown Keyball model")/\/\/ bypassed/g' "$KEYBALL_C"
-          
-          # ファイルの最上行（1行目）に直接定義を焼き付けます
-          sed -i '1s/^/#define KEYBALL_61\n/' "$KEYBALL_C"
-          
-          echo "=== Verification of patched code (Lines 210-250) ==="
-          sed -n '210,250p' "$KEYBALL_C"
-        fi
-
-        # 3. keyball61.h への配列マッピングの補正展開
-        KEYBALL_H="keyboards/keyball_rp2040/keyball61/keyball61.h"
-        if [ -f "$KEYBALL_H" ]; then
-          echo "" >> "$KEYBALL_H"
-          echo "#ifndef LAYOUT_universal" >> "$KEYBALL_H"
-          echo "#define LAYOUT_universal( \\" >> "$KEYBALL_H"
-          echo "    K00, K01, K02, K03, K04, K05, K06, K07, K08, K09, K0a, K0b, K0c, K0d, K0e, K0f, \\" >> "$KEYBALL_H"
-          echo "    K10, K11, K12, K13, K14, K15, K16, K17, K18, K19, K1a, K1b, K1c, K1d, K1e, K1f, \\" >> "$KEYBALL_H"
-          echo "    K20, K21, K22, K23, K24, K25, K26, K27, K28, K29, K2a, K2b, K2c, K2d, K2e, K2f, \\" >> "$KEYBALL_H"
-          echo "    K30, K31, K32, K33, K34, K35, K36, K37, K38, K39, K3a, K3b, K3c, K3d, K3e, K3f  \\" >> "$KEYBALL_H"
-          echo ") \\" >> "$KEYBALL_H"
-          echo "{ \\" >> "$KEYBALL_H"
-          echo "    { K00, K01, K02, K03, K04, K05, K06, K07 }, \\" >> "$KEYBALL_H"
-          echo "    { K08, K09, K0a, K0b, K0c, K0d, K0e, K0f }, \\" >> "$KEYBALL_H"
-          echo "    { K10, K11, K12, K13, K14, K15, K16, K17 }, \\" >> "$KEYBALL_H"
-          echo "    { K18, K19, K1a, K1b, K1c, K1d, K1e, K1f }, \\" >> "$KEYBALL_H"
-          echo "    { K20, K21, K22, K23, K24, K25, K26, K27 }, \\" >> "$KEYBALL_H"
-          echo "    { K28, K29, K2a, K2b, K2c, K2d, K2e, K2f }, \\" >> "$KEYBALL_H"
-          echo "    { K30, K31, K32, K33, K34, K35, K36, K37 }, \\" >> "$KEYBALL_H"
-          echo "    { K38, K39, K3a, K3b, K3c, K3d, K3e, K3f }  \\" >> "$KEYBALL_H"
-          echo "}" >> "$KEYBALL_H"
-          echo "#endif" >> "$KEYBALL_H"
-        fi
-
-        # 4. ビルド実行
+        # 本家の正常なビルドパイプラインを通じてコンパイルを実行
         qmk compile -kb keyball_rp2040/keyball61 -km default
 
+    # 5. 成果物のビルド完了ファイルの吸い出し
     - name: Upload Firmware Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: keyball61-rp2040-firmware
+        name: keyball61-rp2040-clean-firmware
         path: |
           qmk_firmware/.build/*.hex
           qmk_firmware/.build/*.bin
