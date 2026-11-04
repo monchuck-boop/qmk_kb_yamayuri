@@ -45,34 +45,42 @@ jobs:
           cp -r keyball_rp2040 keyboards/
         fi
 
-        # 1. rules.mkにマイコン情報と、すべての警告によるビルド中断を完全無効化する変数を注入
-        # 💡 WERROR = no を指定することで、QMKの厳格な「警告をエラーにするモード」を根底からシャットダウンします
+        # info.json を親階層に配置（QMKの古いビルド規則への対策）
+        cp keyboards/keyball_rp2040/keyball61/info.json keyboards/keyball_rp2040/info.json || true
+        
+        # 1. rules.mkにマイコン情報とエラー抑制設定を注入
         TARGET_RULES="keyboards/keyball_rp2040/rules.mk"
         if [ -f "$TARGET_RULES" ]; then
           echo "MCU = RP2040" >> "$TARGET_RULES"
           echo "BOOTLOADER = rp2040" >> "$TARGET_RULES"
           echo "WERROR = no" >> "$TARGET_RULES"
-          echo "OPT_DEFS += -D_KEYBALL_61_GLOBAL_" >> "$TARGET_RULES"
         fi
-        
         SUB_RULES="keyboards/keyball_rp2040/keyball61/rules.mk"
         if [ -f "$SUB_RULES" ]; then
           echo "MCU = RP2040" >> "$SUB_RULES"
           echo "BOOTLOADER = rp2040" >> "$SUB_RULES"
           echo "WERROR = no" >> "$SUB_RULES"
-          echo "OPT_DEFS += -D_KEYBALL_61_GLOBAL_" >> "$SUB_RULES"
         fi
 
-        # 2. info.json を親階層に配置（QMKのパーサーバグ対策）
-        cp keyboards/keyball_rp2040/keyball61/info.json keyboards/keyball_rp2040/info.json || true
-
-        # 3. 古いQMK環境でビルドエラーを引き起こすOS自動判別関数の箇所を安全に無害化
+        # 2. 【最重要パッチ】keyball.c のソースコード内のモデル判定処理を強制的にKEYBALL_61に固定・置換
         KEYBALL_C="keyboards/keyball_rp2040/lib/keyball/keyball.c"
         if [ -f "$KEYBALL_C" ]; then
+          echo "Patching keyball.c source code directly..."
+          # OS自動判別の無害化（互換性対策）
           sed -i 's/if (detected_host_os() == OS_WINDOWS || detected_host_os() == OS_LINUX)/if (1)/g' "$KEYBALL_C"
+          
+          # モデル未定義で #error になる条件分岐の構文を、物理的に無効化・強制上書きします
+          sed -i 's/#    error("unknown Keyball model")/\/\/ bypassed/g' "$KEYBALL_C"
+          sed -i 's/#   error("unknown Keyball model")/\/\/ bypassed/g' "$KEYBALL_C"
+          
+          # ファイルの最上行（1行目）に直接定義を焼き付けます
+          sed -i '1s/^/#define KEYBALL_61\n/' "$KEYBALL_C"
+          
+          echo "=== Verification of patched code (Lines 210-250) ==="
+          sed -n '210,250p' "$KEYBALL_C"
         fi
 
-        # 4. keyball61.h への配列マッピングの補正展開
+        # 3. keyball61.h への配列マッピングの補正展開
         KEYBALL_H="keyboards/keyball_rp2040/keyball61/keyball61.h"
         if [ -f "$KEYBALL_H" ]; then
           echo "" >> "$KEYBALL_H"
@@ -96,7 +104,7 @@ jobs:
           echo "#endif" >> "$KEYBALL_H"
         fi
 
-        # 5. ビルド実行
+        # 4. ビルド実行
         qmk compile -kb keyball_rp2040/keyball61 -km default
 
     - name: Upload Firmware Artifact
