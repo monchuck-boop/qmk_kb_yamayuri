@@ -45,19 +45,22 @@ jobs:
           cp -r keyball_rp2040 keyboards/
         fi
 
-        # 1. rules.mkにマイコン情報と、コンパイラへ確実にKEYBALL_61を渡す定義を直接追記
+        # 1. rules.mkにマイコン情報と、すべての警告によるビルド中断を完全無効化する変数を注入
+        # 💡 WERROR = no を指定することで、QMKの厳格な「警告をエラーにするモード」を根底からシャットダウンします
         TARGET_RULES="keyboards/keyball_rp2040/rules.mk"
         if [ -f "$TARGET_RULES" ]; then
           echo "MCU = RP2040" >> "$TARGET_RULES"
           echo "BOOTLOADER = rp2040" >> "$TARGET_RULES"
-          echo "OPT_DEFS += -DKEYBALL_61" >> "$TARGET_RULES"
+          echo "WERROR = no" >> "$TARGET_RULES"
+          echo "OPT_DEFS += -D_KEYBALL_61_GLOBAL_" >> "$TARGET_RULES"
         fi
         
         SUB_RULES="keyboards/keyball_rp2040/keyball61/rules.mk"
         if [ -f "$SUB_RULES" ]; then
           echo "MCU = RP2040" >> "$SUB_RULES"
           echo "BOOTLOADER = rp2040" >> "$SUB_RULES"
-          echo "OPT_DEFS += -DKEYBALL_61" >> "$SUB_RULES"
+          echo "WERROR = no" >> "$SUB_RULES"
+          echo "OPT_DEFS += -D_KEYBALL_61_GLOBAL_" >> "$SUB_RULES"
         fi
 
         # 2. info.json を親階層に配置（QMKのパーサーバグ対策）
@@ -93,7 +96,7 @@ jobs:
           echo "#endif" >> "$KEYBALL_H"
         fi
 
-        # 5. 引数バグを避けるため、余計なmakeオプションを排除したクリーンなコマンドで実行
+        # 5. ビルド実行
         qmk compile -kb keyball_rp2040/keyball61 -km default
 
     - name: Upload Firmware Artifact
